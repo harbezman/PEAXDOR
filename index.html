@@ -259,9 +259,31 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
 .alert-item.overdue{background:#fde8ec;color:#b91c1c}
 .alert-item.today{background:#fff0d0;color:#92400e}
 .alert-item.soon{background:#fef9c3;color:#854d0e}
+
+/* password screen */
+#pw-screen{position:fixed;inset:0;background:#1a1f3c;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Heebo,sans-serif}
+#pw-screen.hidden{display:none}
 </style>
 </head>
 <body>
+<!-- PASSWORD SCREEN -->
+<div id="pw-screen">
+  <div style="text-align:center;margin-bottom:32px">
+    <div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:1px">PEAX</div>
+    <div style="font-size:14px;color:#9aaad0;margin-top:6px">Account Intelligence</div>
+  </div>
+  <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:32px 36px;width:320px;text-align:center">
+    <div style="font-size:15px;color:#cdd5e0;margin-bottom:20px">הכנס סיסמה</div>
+    <input id="pw-input" type="password" placeholder="••••••••"
+      style="width:100%;box-sizing:border-box;padding:12px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:16px;font-family:Heebo,sans-serif;outline:none;text-align:center;letter-spacing:4px"
+      onkeydown="if(event.key==='Enter')checkPw()">
+    <div id="pw-err" style="color:#e2445c;font-size:12px;margin-top:10px;min-height:18px"></div>
+    <button onclick="checkPw()"
+      style="margin-top:12px;width:100%;padding:12px;border-radius:8px;border:none;background:#0073ea;color:#fff;font-size:15px;font-family:Heebo,sans-serif;font-weight:700;cursor:pointer">כניסה</button>
+  </div>
+  <div style="font-size:11px;color:#4a5568;margin-top:24px">PEAX DORCOM © 2026</div>
+</div>
+
 <aside class="sb">
   <div class="sb-logo">
     <div class="sb-icon">IQ</div>
@@ -2009,5 +2031,17 @@ load();fillUSel('nc-u',null);renderAll();
   </div>
 </div>
 
+
+<script>
+(function(){
+  var PW='Dorcom2026', SK='aiq_auth';
+  function unlock(){document.getElementById('pw-screen').classList.add('hidden');sessionStorage.setItem(SK,'1');}
+  window.checkPw=function(){
+    if(document.getElementById('pw-input').value===PW){unlock();}
+    else{document.getElementById('pw-err').textContent='סיסמה שגויה';document.getElementById('pw-input').value='';document.getElementById('pw-input').focus();}
+  };
+  if(sessionStorage.getItem(SK)==='1'){unlock();}
+})();
+</script>
 </body>
 </html>
