@@ -302,6 +302,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
       <button class="btn" onclick="exportPPTX()" style="border-color:#a25ddc;color:#a25ddc">📊 PPTX</button>
       <button class="btn" onclick="exportQuickReview()" style="border-color:#0073ea;color:#fff;background:#0073ea;font-weight:700">🚀 סקירה מהירה</button>
       <button class="btn btn-del" onclick="doReset()">איפוס</button>
+      <span id="sync-status" style="font-size:11px;color:var(--tx3);margin-right:4px">⏳ טוען...</span>
     </div>
   </div>
   <!-- ALERT BANNER -->
@@ -596,8 +597,78 @@ const SC=[
 // ═══════════ STATE ═══════════
 const SK='aiq4b';
 let S={units:[],contacts:[],team:[]};
-function load(){
-  try{const r=localStorage.getItem(SK);if(r)S=JSON.parse(r);}catch(e){}
+// ═══════════ SUPABASE SYNC ═══════════
+const SB_URL = 'https://bderqimalyfryyxzcqmk.supabase.co';
+const SB_KEY = 'sb_publishable_2hNGEFKKa_-8s7B__GB2kg_6NeHT7XB';
+let _syncTimeout = null;
+let _syncing = false;
+
+async function sbFetch(method, body) {
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/accountiq_data?id=eq.main', {
+      method,
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': 'Bearer ' + SB_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': method === 'PATCH' ? 'return=minimal' : 'return=representation'
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if (!res.ok) throw new Error(await res.text());
+    if (method === 'GET') return res.json();
+    return true;
+  } catch(e) {
+    console.warn('Supabase error:', e);
+    return null;
+  }
+}
+
+function setSyncStatus(status) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const map = {
+    saving: '⏳ שומר...',
+    saved:  '☁️ שמור בענן',
+    error:  '⚠️ שגיאת שמירה',
+    loading:'⏳ טוען...',
+    offline:'💾 מקומי'
+  };
+  el.textContent = map[status] || '';
+  el.style.color = status === 'error' ? 'var(--re)' : status === 'saved' ? '#1a7a45' : 'var(--tx3)';
+}
+
+function save() {
+  // Always save locally first
+  try { localStorage.setItem(SK, JSON.stringify(S)); } catch(e) {}
+  // Debounce cloud save
+  if (_syncTimeout) clearTimeout(_syncTimeout);
+  setSyncStatus('saving');
+  _syncTimeout = setTimeout(async () => {
+    if (_syncing) return;
+    _syncing = true;
+    const ok = await sbFetch('PATCH', { data: S, updated_at: new Date().toISOString() });
+    _syncing = false;
+    setSyncStatus(ok ? 'saved' : 'error');
+  }, 1500);
+}
+
+async function load() {
+  setSyncStatus('loading');
+  // Try cloud first
+  const rows = await sbFetch('GET');
+  if (rows && rows.length > 0 && rows[0].data && Object.keys(rows[0].data).length > 0) {
+    S = rows[0].data;
+    setSyncStatus('saved');
+  } else {
+    // Fall back to localStorage
+    try { const r = localStorage.getItem(SK); if(r) S = JSON.parse(r); } catch(e) {}
+    setSyncStatus('offline');
+    // If we have local data, push it to cloud
+    if (S.units?.length) {
+      sbFetch('PATCH', { data: S, updated_at: new Date().toISOString() });
+    }
+  }
   if(!S.units?.length)   S.units   =JSON.parse(JSON.stringify(SU));
   if(!S.contacts?.length)S.contacts=JSON.parse(JSON.stringify(SC));
   if(!S.team)            S.team    =[];
@@ -605,7 +676,6 @@ function load(){
   if(!S.tasks)           S.tasks   =[];
   if(!S.events)          S.events  =[];
 }
-function save(){try{localStorage.setItem(SK,JSON.stringify(S));}catch(e){}}
 function doReset(){if(!confirm('לאפס?'))return;localStorage.removeItem(SK);load();renderAll();}
 
 // ═══════════ CONSTANTS ═══════════
