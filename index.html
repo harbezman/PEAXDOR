@@ -220,6 +220,10 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
 .dr-sec-ttl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--tx3);border-bottom:1px solid var(--br);padding-bottom:6px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
 .dr-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--br)}.dr-row:last-child{border-bottom:none}
 .dr-cn{font-size:13px;font-weight:600}.dr-cr{font-size:11px;color:var(--tx2);margin-top:1px}
+.wrm-hot{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700}
+.wrm-warm{background:#fff3cd;color:#92400e;border:1px solid #fcd34d;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700}
+.wrm-cold{background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700}
+.wrm-neutral{background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700}
 .dr-lnk{font-size:11px;margin-top:3px;display:flex;flex-wrap:wrap;gap:8px}
 /* team row in drawer */
 .trow{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--br)}.trow:last-child{border-bottom:none}
@@ -321,6 +325,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
       <button class="btn btn-p" onclick="openM('mu')">+ הוסף יחידה</button>
       <button class="btn" onclick="triggerImport()" style="border-color:#0073ea;color:#0073ea">📥 ייבוא מ-Excel</button>
       <input type="file" id="xlsx-input" accept=".xlsx,.xls" style="display:none" onchange="handleImport(event)">
+      <button class="btn" onclick="exportExcel()" style="border-color:#1a7a45;color:#1a7a45">📊 ייצוא Excel</button>
       <button class="btn" onclick="exportPPTX()" style="border-color:#a25ddc;color:#a25ddc">📊 PPTX</button>
       <button class="btn" onclick="exportQuickReview()" style="border-color:#0073ea;color:#fff;background:#0073ea;font-weight:700">🚀 סקירה מהירה</button>
       <button class="btn btn-del" onclick="doReset()">איפוס</button>
@@ -389,7 +394,8 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
         <thead><tr>
           <th style="width:155px">שם</th><th style="width:185px">תפקיד</th>
           <th style="width:145px">יחידה</th><th style="width:70px">חברה</th>
-          <th style="width:80px">סטטוס</th><th>טלפון</th><th>אימייל</th>
+          <th style="width:80px">סטטוס</th><th style="width:75px">מגע אחרון</th>
+          <th style="width:80px">יחסים</th><th>הערות</th><th>טלפון</th><th>אימייל</th>
         </tr></thead>
         <tbody id="c-tbody"></tbody>
       </table></div>
@@ -483,6 +489,15 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
     <div class="fr"><div class="fl">יחידה</div><select class="fi" id="nc-u"></select></div>
     <div class="fr"><div class="fl">טלפון</div><input class="fi" id="nc-p"></div>
     <div class="fr"><div class="fl">אימייל</div><input class="fi" id="nc-e"></div>
+    <div class="fr"><div class="fl">מגע אחרון</div><input class="fi" id="nc-lc" type="date"></div>
+    <div class="fr"><div class="fl">מערכת יחסים</div>
+      <select class="fi" id="nc-wrm">
+        <option value="neutral">⚪ ניטרלי</option>
+        <option value="hot">🔴 חם</option>
+        <option value="warm">🟡 ניטרלי-חם</option>
+        <option value="cold">🔵 קר</option>
+      </select></div>
+    <div class="fr"><div class="fl">הערות</div><textarea class="fi" id="nc-note" rows="2" placeholder="מאוד טכני, מקבל החלטות..."></textarea></div>
     <div class="fr" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="nc-m" style="width:15px;height:15px"><label for="nc-m" style="font-size:13px;cursor:pointer">מקבל החלטות / מנהל</label></div>
     <div class="macts"><button class="btn" onclick="closeM('mc')">ביטול</button><button class="btn btn-p" onclick="addContact()">הוסף</button></div>
   </div>
@@ -927,6 +942,20 @@ function renderTeam(){
 // ═══════════ CONTACTS ═══════════
 let CF='all';
 function setCF(f,el){CF=f;document.querySelectorAll('#view-contacts .fc').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderC();}
+function wrmDot(w){return w==='hot'?'#ef4444':w==='warm'?'#f59e0b':w==='cold'?'#3b82f6':'#9ca3af';}
+
+function saveContactField(cid, field, val){
+  const c=S.contacts.find(x=>x.id===cid); if(!c) return;
+  c[field]=val; save();
+}
+function saveCNote(el){
+  const cid=el.dataset.cid, val=el.textContent.trim();
+  const c=S.contacts.find(x=>x.id===cid); if(!c) return;
+  if(!val){el.textContent='הערה...';el.classList.add('em');c.note='';}
+  else{el.classList.remove('em');c.note=val;}
+  save();
+}
+
 function renderC(){
   const q=(document.getElementById('csrch').value||'').toLowerCase();
   let list=[...S.contacts];
@@ -939,9 +968,43 @@ function renderC(){
     const u=gu(c.unit);
     const st=u?(u.status==='active'?`<span class="pill p-gr" style="font-size:10px">פעיל</span>`:u.status==='opp'?`<span class="pill p-or" style="font-size:10px">הזדמנות</span>`:`<span class="pill p-re" style="font-size:10px">לא מטופל</span>`):'';
     const lv=c.leaving?'<span class="ltag">עוזב</span>':'';
-    return`<tr onclick="openDr('${c.unit}')"><td><div class="cc"><div class="av" style="background:${cavc(c.name)}">${ini(c.name)}</div><span style="font-weight:600">${c.name}${lv}</span></div></td>
-      <td style="color:var(--tx2)">${c.role||'—'}</td><td>${u?u.name:'—'}</td><td>${u?cop(u.co):'—'}</td><td>${st}</td>
-      <td style="font-size:12px;color:var(--tx2)">${c.phone||'—'}</td><td style="font-size:12px;color:var(--bl)">${c.email||'—'}</td></tr>`;
+    const wrm=c.warmth||'neutral';
+    return`<tr>
+      <td onclick="openDr('${c.unit}')" style="cursor:pointer"><div class="cc">
+        <div class="av" style="background:${cavc(c.name)};position:relative">
+          ${ini(c.name)}
+          <div style="position:absolute;bottom:-2px;left:-2px;width:8px;height:8px;border-radius:50%;background:${wrmDot(wrm)};border:1.5px solid var(--wh)"></div>
+        </div>
+        <span style="font-weight:600">${c.name}${lv}</span>
+      </div></td>
+      <td style="color:var(--tx2)">${c.role||'—'}</td>
+      <td onclick="openDr('${c.unit}')" style="cursor:pointer">${u?u.name:'—'}</td>
+      <td>${u?cop(u.co):'—'}</td>
+      <td>${st}</td>
+      <td onclick="event.stopPropagation()" style="padding:0 4px">
+        <input type="date" value="${c.lastContact||''}"
+          style="border:none;background:none;font-family:inherit;font-size:11px;color:var(--tx2);padding:4px;width:110px;cursor:pointer;outline:none"
+          onchange="saveContactField('${c.id}','lastContact',this.value)"
+          onfocus="this.style.background='#eef4ff'" onblur="this.style.background='none'">
+      </td>
+      <td onclick="event.stopPropagation()" style="padding:0 4px">
+        <select style="border:1px solid var(--br);background:var(--wh);font-family:inherit;font-size:11px;padding:3px 5px;cursor:pointer;outline:none;border-radius:6px"
+          onchange="saveContactField('${c.id}','warmth',this.value)">
+          <option value="hot" ${wrm==='hot'?'selected':''}>🔴 חם</option>
+          <option value="warm" ${wrm==='warm'?'selected':''}>🟡 ניטרלי-חם</option>
+          <option value="neutral" ${wrm==='neutral'?'selected':''}>⚪ ניטרלי</option>
+          <option value="cold" ${wrm==='cold'?'selected':''}>🔵 קר</option>
+        </select>
+      </td>
+      <td onclick="event.stopPropagation()" style="min-width:140px">
+        <div contenteditable="true" class="notec ${c.note?'':'em'}"
+          data-cid="${c.id}" data-cf="note"
+          onblur="saveCNote(this)" onfocus="if(this.classList.contains('em')){this.textContent='';this.classList.remove('em')}"
+          style="font-size:11px;padding:4px 6px">${c.note||'הערה...'}</div>
+      </td>
+      <td style="font-size:12px;color:var(--tx2)">${c.phone||'—'}</td>
+      <td style="font-size:12px;color:var(--bl)">${c.email||'—'}</td>
+    </tr>`;
   }).join('');
 }
 
@@ -1059,8 +1122,21 @@ function openDr(uid){
   const mgrs=cons.filter(c=>c.mgr),others=cons.filter(c=>!c.mgr);
   const cRow=list=>list.map(c=>{
     const lv=c.leaving?'<span class="ltag">עוזב</span>':'';
-    return`<div class="dr-row"><div class="av" style="background:${cavc(c.name)}">${ini(c.name)}</div>
-      <div style="flex:1;min-width:0"><div class="dr-cn">${c.name}${lv}</div><div class="dr-cr">${c.role||''}</div>
+    const wrm=c.warmth||'neutral';
+    const wrmColors={'hot':'#ef4444','warm':'#f59e0b','neutral':'#9ca3af','cold':'#3b82f6'};
+    const wrmTxt={'hot':'חם','warm':'ניטרלי-חם','neutral':'ניטרלי','cold':'קר'};
+    return`<div class="dr-row"><div class="av" style="background:${cavc(c.name)};position:relative">
+        ${ini(c.name)}
+        <div style="position:absolute;bottom:-2px;left:-2px;width:8px;height:8px;border-radius:50%;background:${wrmColors[wrm]};border:1.5px solid var(--wh)"></div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="dr-cn">${c.name}${lv}</div>
+        <div class="dr-cr">${c.role||''}</div>
+        ${c.note?`<div style="font-size:11px;color:var(--tx2);margin-top:2px;font-style:italic">${c.note}</div>`:''}
+        <div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap">
+          ${c.lastContact?`<span style="font-size:10px;color:var(--tx3)">📅 ${c.lastContact}</span>`:''}
+          <span style="font-size:10px;color:${wrmColors[wrm]};font-weight:600">${wrmTxt[wrm]}</span>
+        </div>
         <div class="dr-lnk">${c.phone?`<span style="color:var(--tx2)">${c.phone}</span>`:''} ${c.email?`<a href="mailto:${c.email}" style="color:var(--bl);text-decoration:none">${c.email}</a>`:''}</div>
       </div><button class="btn btn-del btn-sm" onclick="delC('${c.id}')">✕</button></div>`;
   }).join('');
@@ -1163,10 +1239,24 @@ function addUnit(){
   S.units.push({id:nuid(),co:document.getElementById('nu-co').value,name,status:document.getElementById('nu-st').value,have:[],opp:[],note:document.getElementById('nu-note').value.trim()});
   save();closeM('mu');renderAll();
 }
-function openAddCForU(uid){closeD();fillUSel('nc-u',uid);openM('mc');}
+function openAddCForU(uid){
+  closeD();
+  fillUSel('nc-u',uid);
+  ['nc-n','nc-r','nc-p','nc-e','nc-note'].forEach(i=>{const el=document.getElementById(i);if(el)el.value='';});
+  const lc=document.getElementById('nc-lc');if(lc)lc.value='';
+  const wrm=document.getElementById('nc-wrm');if(wrm)wrm.value='neutral';
+  const m=document.getElementById('nc-m');if(m)m.checked=false;
+  openM('mc');
+}
 function addContact(){
   const name=document.getElementById('nc-n').value.trim();if(!name)return alert('הכנס שם');
-  S.contacts.push({id:ncid(),name,role:document.getElementById('nc-r').value.trim(),unit:document.getElementById('nc-u').value,phone:document.getElementById('nc-p').value.trim()||null,email:document.getElementById('nc-e').value.trim()||null,mgr:document.getElementById('nc-m').checked});
+  S.contacts.push({id:ncid(),name,role:document.getElementById('nc-r').value.trim(),unit:document.getElementById('nc-u').value,
+    phone:document.getElementById('nc-p').value.trim()||null,email:document.getElementById('nc-e').value.trim()||null,
+    mgr:document.getElementById('nc-m').checked,
+    lastContact:document.getElementById('nc-lc').value||null,
+    warmth:document.getElementById('nc-wrm').value||'neutral',
+    note:document.getElementById('nc-note').value.trim()||''
+  });
   save();closeM('mc');renderAll();
 }
 let _tpu=null;
@@ -1958,8 +2048,79 @@ function deleteEvent(id){
   S.events=S.events.filter(e=>e.id!==id); save(); renderTimeline();
 }
 
+// ═══════════ EXPORT EXCEL ═══════════
+function exportExcel(){
+  const wb = XLSX.utils.book_new();
+  const today = new Date().toLocaleDateString('he-IL');
+
+  // ── Sheet 1: אנשי קשר ──
+  const wrmTxt = {hot:'חם', warm:'ניטרלי-חם', neutral:'ניטרלי', cold:'קר'};
+  const contactRows = S.contacts.map(c=>{
+    const u=gu(c.unit);
+    const unitSt = u?(u.status==='active'?'פעיל':u.status==='opp'?'הזדמנות':'לא מטופל'):'';
+    return {
+      'שם': c.name||'',
+      'תפקיד': c.role||'',
+      'יחידה': u?u.name:'',
+      'חברה': u?(u.co==='elta'?'אלתא':'תע״א'):'',
+      'סטטוס יחידה': unitSt,
+      'מגע אחרון': c.lastContact||'',
+      'מערכת יחסים': wrmTxt[c.warmth||'neutral'],
+      'הערות': c.note||'',
+      'טלפון': c.phone||'',
+      'אימייל': c.email||'',
+      'מקבל החלטות': c.mgr?'כן':''
+    };
+  });
+  const ws1 = XLSX.utils.json_to_sheet(contactRows, {skipHeader:false});
+  ws1['!cols'] = [20,18,20,8,12,14,14,30,14,24,12].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws1, 'אנשי קשר');
+
+  // ── Sheet 2: יחידות ──
+  const unitRows = S.units.map(u=>{
+    const team=ut(u.id).map(t=>t.name).join(', ');
+    const stTxt=u.status==='active'?'פעיל':u.status==='opp'?'הזדמנות':'לא מטופל';
+    return {
+      'יחידה': u.name||'',
+      'חברה': u.co==='elta'?'אלתא':'תע״א',
+      'סטטוס': stTxt,
+      'פגישה אחרונה': u.lastMeeting||'',
+      'צוות PEAX': team||'',
+      'יש לנו': (u.have||[]).map(c=>PM[c]).join(', '),
+      'הזדמנויות': (u.opp||[]).map(c=>PM[c]).join(', '),
+      'הערות': u.note||''
+    };
+  });
+  const ws2 = XLSX.utils.json_to_sheet(unitRows, {skipHeader:false});
+  ws2['!cols'] = [22,8,12,14,24,30,30,30].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws2, 'יחידות');
+
+  // ── Sheet 3: משימות פתוחות ──
+  const openTasks = (S.tasks||[]).filter(t=>t.status!=='done').sort((a,b)=>(a.due||'').localeCompare(b.due||''));
+  const taskRows = openTasks.map(t=>{
+    const u=gu(t.unit);
+    const priTxt={high:'גבוהה',med:'בינונית',low:'נמוכה'}[t.pri]||'בינונית';
+    const stTxt=taskStatus(t)==='overdue'?'באיחור':t.status==='wip'?'בטיפול':'פתוח';
+    return {
+      'משימה': t.desc||'',
+      'יחידה': u?u.name:'',
+      'אחראי': t.owner||'',
+      'תאריך יעד': t.due||'',
+      'עדיפות': priTxt,
+      'סטטוס': stTxt
+    };
+  });
+  const ws3 = XLSX.utils.json_to_sheet(taskRows.length?taskRows:[{'משימה':'אין משימות פתוחות'}]);
+  ws3['!cols'] = [35,22,16,14,10,12].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws3, 'משימות פתוחות');
+
+  // ── הורד ──
+  const d = today.replace(/\//g,'-');
+  XLSX.writeFile(wb, `AccountIQ-${d}.xlsx`);
+}
+
 // ── INIT ──
-load();fillUSel('nc-u',null);renderAll();
+load().then(()=>{fillUSel('nc-u',null);renderAll();});
 </script>
 <!-- VENDOR MODAL -->
 <div class="mbg" id="mvend" onclick="if(event.target===this)closeM('mvend')">
