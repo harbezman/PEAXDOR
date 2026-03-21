@@ -141,10 +141,11 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
 .gbar{width:6px;height:20px;border-radius:3px;flex-shrink:0}
 .gtit{font-size:14px;font-weight:700}
 .gm{font-size:12px;color:var(--tx2);background:var(--br);border-radius:10px;padding:1px 8px}
-.tw{border:1px solid var(--br);border-radius:var(--r);background:var(--wh);overflow:hidden}
-.tw table{width:100%;border-collapse:collapse}
-.tw th{background:#f9fafb;border-bottom:1px solid var(--br);padding:8px 12px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--tx2);white-space:nowrap}
-.tw td{border-bottom:1px solid var(--br);vertical-align:top;padding:0}
+.tw{border:1px solid var(--br);border-radius:var(--r);background:var(--wh);overflow:visible}
+.tw table{width:100%;border-collapse:collapse;table-layout:fixed}
+.tw th{background:#f9fafb;border-bottom:1px solid var(--br);padding:8px 12px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tw th:first-child{border-radius:0 var(--r) 0 0}.tw th:last-child{border-radius:var(--r) 0 0 0}
+.tw td{border-bottom:1px solid var(--br);vertical-align:middle;padding:0;overflow:visible}
 .tw tr:last-child td{border-bottom:none}.tw tr:hover td{background:#f5f6fb}
 .cell{padding:8px 12px;min-height:40px;display:flex;align-items:center;flex-wrap:wrap;gap:3px}
 /* pills */
@@ -395,7 +396,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
           <th style="width:155px">שם</th><th style="width:185px">תפקיד</th>
           <th style="width:145px">יחידה</th><th style="width:70px">חברה</th>
           <th style="width:80px">סטטוס</th><th style="width:75px">מגע אחרון</th>
-          <th style="width:80px">יחסים</th><th>הערות</th><th>טלפון</th><th>אימייל</th>
+          <th style="width:80px">יחסים</th><th>הערות</th><th>טלפון</th><th>אימייל</th><th style="width:40px"></th>
         </tr></thead>
         <tbody id="c-tbody"></tbody>
       </table></div>
@@ -433,6 +434,9 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
         <button class="fc"    id="tlf-deal"    onclick="setTLF('deal',this)">💰 עסקאות</button>
         <button class="fc"    id="tlf-demo"    onclick="setTLF('demo',this)">🖥 Demo</button>
         <button class="fc"    id="tlf-other"   onclick="setTLF('other',this)">📌 אחר</button>
+        <select id="tlf-unit" onchange="renderTimeline()" style="margin-right:8px;font-size:12px;padding:3px 8px;border:1px solid var(--br);border-radius:6px;background:var(--bg);color:var(--tx1)">
+          <option value="">כל היחידות</option>
+        </select>
         <button class="btn btn-p" style="margin-right:auto" onclick="openAddEvent(null)">+ הוסף אירוע</button>
       </div>
       <div id="timeline-wrap" style="max-width:700px"></div>
@@ -474,12 +478,14 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--tx);min-hei
 
 <!-- MODALS -->
 <div class="mbg" id="mu" onclick="if(event.target===this)closeM('mu')">
-  <div class="modal"><h2>➕ הוסף יחידה</h2>
+  <div class="modal"><h2 id="mu-title">➕ הוסף יחידה</h2>
     <div class="fr"><div class="fl">שם היחידה</div><input class="fi" id="nu-n" placeholder="למשל: אלתא חימוש"></div>
     <div class="fr"><div class="fl">חברה</div><select class="fi" id="nu-co"><option value="elta">אלתא מערכות</option><option value="iai">התעשייה האווירית</option></select></div>
     <div class="fr"><div class="fl">סטטוס</div><select class="fi" id="nu-st"><option value="none">לא מטופל</option><option value="active">יש פעילות</option><option value="opp">יש הזדמנות</option></select></div>
+    <div class="fr"><div class="fl">פוטנציאל ($)</div><input class="fi" id="nu-pot" type="number" min="0" placeholder="0" style="width:120px"></div>
+    <div class="fr"><div class="fl">עדיפות</div><select class="fi" id="nu-pri"><option value="">—</option><option value="high">🔴 גבוהה</option><option value="mid">🟡 בינונית</option><option value="low">🟢 נמוכה</option></select></div>
     <div class="fr"><div class="fl">הערה</div><textarea class="fi" id="nu-note" rows="2"></textarea></div>
-    <div class="macts"><button class="btn" onclick="closeM('mu')">ביטול</button><button class="btn btn-p" onclick="addUnit()">הוסף</button></div>
+    <div class="macts"><button class="btn" onclick="closeM('mu')">ביטול</button><button class="btn btn-p" id="mu-save-btn" onclick="addUnit()">הוסף</button></div>
   </div>
 </div>
 <div class="mbg" id="mc" onclick="if(event.target===this)closeM('mc')">
@@ -691,27 +697,36 @@ function save() {
 }
 
 async function load() {
-  setSyncStatus('loading');
-  // Try cloud first
-  const rows = await sbFetch('GET');
-  if (rows && rows.length > 0 && rows[0].data && Object.keys(rows[0].data).length > 0) {
-    S = rows[0].data;
-    setSyncStatus('saved');
-  } else {
-    // Fall back to localStorage
-    try { const r = localStorage.getItem(SK); if(r) S = JSON.parse(r); } catch(e) {}
-    setSyncStatus('offline');
-    // If we have local data, push it to cloud
-    if (S.units?.length) {
-      sbFetch('PATCH', { data: S, updated_at: new Date().toISOString() });
-    }
-  }
+  // 1. טען מיד מ-localStorage — ללא המתנה
+  try { const r = localStorage.getItem(SK); if(r) S = JSON.parse(r); } catch(e) {}
   if(!S.units?.length)   S.units   =JSON.parse(JSON.stringify(SU));
   if(!S.contacts?.length)S.contacts=JSON.parse(JSON.stringify(SC));
   if(!S.team)            S.team    =[];
   if(!S.vendors)         S.vendors ={};
   if(!S.tasks)           S.tasks   =[];
   if(!S.events)          S.events  =[];
+
+  // 2. בשקט בטסט מ-Supabase ברקע — אם יש עדכון, רענן
+  setSyncStatus('loading');
+  sbFetch('GET').then(rows => {
+    if (rows && rows.length > 0 && rows[0].data && Object.keys(rows[0].data).length > 0) {
+      S = rows[0].data;
+      if(!S.units?.length)   S.units   =JSON.parse(JSON.stringify(SU));
+      if(!S.contacts?.length)S.contacts=JSON.parse(JSON.stringify(SC));
+      if(!S.team)            S.team    =[];
+      if(!S.vendors)         S.vendors ={};
+      if(!S.tasks)           S.tasks   =[];
+      if(!S.events)          S.events  =[];
+      setSyncStatus('saved');
+      fillUSel('nc-u',null);
+      renderAll();
+    } else {
+      setSyncStatus('offline');
+      if (S.units?.length) {
+        sbFetch('PATCH', { data: S, updated_at: new Date().toISOString() });
+      }
+    }
+  }).catch(()=>setSyncStatus('offline'));
 }
 function doReset(){if(!confirm('לאפס?'))return;localStorage.removeItem(SK);load();renderAll();}
 
@@ -793,10 +808,10 @@ function renderBoard(){
     </div>
     <div id="gw-${co}" style="${open?'':'display:none'}">
       <div class="tw"><table>
-        <colgroup><col style="width:180px"><col style="width:110px"><col style="width:110px"><col style="width:145px"><col style="width:200px"><col style="width:200px"><col style="width:115px"><col></colgroup>
+        <colgroup><col style="width:160px"><col style="width:90px"><col style="width:110px"><col style="width:110px"><col style="width:120px"><col style="width:120px"><col style="width:90px"><col style="width:120px"><col style="width:90px"><col></colgroup>
         <thead><tr>
           <th>יחידה</th><th>סטטוס</th><th>אנשי קשר 👥</th><th>צוות PEAX 🏢</th>
-          <th>יש לנו ✅</th><th>הזדמנויות 💡</th><th>📅 פגישה אחרונה</th><th>הערות</th>
+          <th>יש לנו ✅</th><th>הזדמנויות 💡</th><th>📅 אחרונה</th><th>🗓 הבאה</th><th>פוטנציאל</th><th>הערות</th>
         </tr></thead>
         <tbody>${cu.map(u=>rh(u)).join('')}</tbody>
       </table><div class="add-row" onclick="openM('mu')">+ הוסף יחידה</div></div>
@@ -825,6 +840,7 @@ function rh(u){
         onclick="event.stopPropagation()" onblur="sf(this)"
         onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
         style="font-size:13px;font-weight:600">${u.name}</span>
+      <button title="ערוך יחידה" onclick="openEditUnit('${u.id}');event.stopPropagation()" style="border:none;background:none;font-size:11px;cursor:pointer;padding:2px 4px;border-radius:4px;color:var(--tx3);opacity:.5;line-height:1;margin-right:2px" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.5'">✏️</button>
     </div></td>
     <td onclick="event.stopPropagation()"><div class="cell" style="justify-content:center">
       <div class="sw" id="sw-${u.id}">${sp(u.status).replace('class="pill','class="pill" onclick="ts(event)"')}
@@ -839,22 +855,30 @@ function rh(u){
     <td onclick="openDr('${u.id}');event.stopPropagation()">${tcell}</td>
     <td onclick="event.stopPropagation()"><div class="ce">${hc}</div></td>
     <td onclick="event.stopPropagation()"><div class="ce">${oc}</div></td>
-    <td onclick="event.stopPropagation()">
-      <div style="display:flex;align-items:center;gap:4px;padding:4px 8px">
-        <input type="date" value="${u.lastMeeting||''}" 
-          style="border:none;background:none;font-family:inherit;font-size:12px;color:var(--tx2);padding:4px 4px;cursor:pointer;outline:none;flex:1"
-          onchange="saveDate(event,'${u.id}')"
-          onfocus="this.style.background='#eef4ff'" onblur="this.style.background='none'">
-        <button title="הוסף משימה ליחידה זו" onclick="openAddTask('${u.id}');event.stopPropagation()"
-          style="border:none;background:none;font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px;color:var(--bl);opacity:.6;line-height:1"
-          onmouseover="this.style.opacity='1';this.style.background='#eef4ff'"
-          onmouseout="this.style.opacity='.6';this.style.background='none'">＋</button>
-      </div>
+    <td onclick="event.stopPropagation()" style="white-space:nowrap;text-align:center;padding:0 6px">
+      <span style="font-size:11px;color:var(--tx2);cursor:pointer" onclick="openDr('${u.id}')" title="לחץ לעריכה בדרואר">${u.lastMeeting||'—'}</span>
     </td>
+    <td onclick="event.stopPropagation()" style="white-space:nowrap;padding:0 4px">
+      <input type="date" value="${u.nextMeeting||''}" 
+        style="border:none;background:none;font-family:inherit;font-size:11px;color:${u.nextMeeting&&u.nextMeeting<new Date().toISOString().slice(0,10)?'var(--re)':'var(--bl)'};padding:2px 2px;cursor:pointer;outline:none"
+        onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"
+        onchange="saveDate(event,'${u.id}','next')"
+        onfocus="this.style.background='#eef4ff'" onblur="this.style.background='none'">
+      <button title="הוסף משימה ליחידה זו" onclick="openAddTask('${u.id}');event.stopPropagation()"
+        style="border:none;background:none;font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px;color:var(--bl);opacity:.6;line-height:1"
+        onmouseover="this.style.opacity='1';this.style.background='#eef4ff'"
+        onmouseout="this.style.opacity='.6';this.style.background='none'">＋</button>
+    </td>
+    <td onclick="openEditUnit('${u.id}');event.stopPropagation()" style="white-space:nowrap;text-align:center;padding:0 6px;cursor:pointer" title="לחץ לעריכה">${(()=>{
+      const PRI={'high':'🔴','mid':'🟡','low':'🟢'};
+      const pot = u.potential ? '$'+Number(u.potential).toLocaleString('en-US') : '—';
+      const pri = u.priority ? PRI[u.priority]||'' : '';
+      return `<div style="font-size:11px;color:var(--tx2)">${pri} ${pot}</div>`;
+    })()}</td>
     <td onclick="event.stopPropagation()"><div contenteditable="true" class="notec ${u.note?'':'em'}" data-uid="${u.id}" data-f="note" onblur="sf(this)" onfocus="if(this.classList.contains('em')){this.textContent='';this.classList.remove('em')}">${u.note||'הערה...'}</div></td>
   </tr>`;
 }
-function saveDate(e,uid){const u=gu(uid);if(!u)return;u.lastMeeting=e.target.value;save();}
+function saveDate(e,uid,which){const u=gu(uid);if(!u)return;if(which==='next')u.nextMeeting=e.target.value;else u.lastMeeting=e.target.value;save();}
 function ts(e){e.stopPropagation();const w=e.target.closest('.sw');if(!w)return;const d=w.querySelector('.sdd');document.querySelectorAll('.sdd.show').forEach(x=>{if(x!==d)x.classList.remove('show')});d.classList.toggle('show');}
 function setSt(uid,st){const u=gu(uid);if(!u)return;u.status=st;save();document.querySelectorAll('.sdd.show').forEach(x=>x.classList.remove('show'));renderBoard();renderOpp();}
 document.addEventListener('click',e=>{if(!e.target.closest('.sw'))document.querySelectorAll('.sdd.show').forEach(x=>x.classList.remove('show'))});
@@ -944,6 +968,47 @@ let CF='all';
 function setCF(f,el){CF=f;document.querySelectorAll('#view-contacts .fc').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderC();}
 function wrmDot(w){return w==='hot'?'#ef4444':w==='warm'?'#f59e0b':w==='cold'?'#3b82f6':'#9ca3af';}
 
+let _editCid = null;
+function openEditC(cid){
+  const c = S.contacts.find(x=>x.id===cid);
+  if(!c) return;
+  _editCid = cid;
+  document.getElementById('nc-n').value  = c.name||'';
+  document.getElementById('nc-r').value  = c.role||'';
+  fillUSel('nc-u', c.unit);
+  document.getElementById('nc-p').value  = c.phone||'';
+  document.getElementById('nc-e').value  = c.email||'';
+  document.getElementById('nc-lc').value = c.lastContact||'';
+  document.getElementById('nc-wrm').value= c.warmth||'neutral';
+  document.getElementById('nc-note').value= c.note||'';
+  document.getElementById('nc-m').checked= !!c.mgr;
+  document.querySelector('#mc h2').textContent = '✏️ עריכת איש קשר';
+  document.querySelector('#mc .macts button:last-child').textContent = 'שמור';
+  document.querySelector('#mc .macts button:last-child').onclick = saveEditC;
+  openM('mc');
+}
+function saveEditC(){
+  const c = S.contacts.find(x=>x.id===_editCid);
+  if(!c){_editCid=null;return;}
+  const name = document.getElementById('nc-n').value.trim();
+  if(!name) return alert('הכנס שם');
+  c.name        = name;
+  c.role        = document.getElementById('nc-r').value.trim();
+  c.unit        = document.getElementById('nc-u').value;
+  c.phone       = document.getElementById('nc-p').value.trim()||null;
+  c.email       = document.getElementById('nc-e').value.trim()||null;
+  c.mgr         = document.getElementById('nc-m').checked;
+  c.lastContact = document.getElementById('nc-lc').value||null;
+  c.warmth      = document.getElementById('nc-wrm').value||'neutral';
+  c.note        = document.getElementById('nc-note').value.trim()||'';
+  _editCid = null;
+  // reset modal title and button
+  document.querySelector('#mc h2').textContent = '➕ הוסף איש קשר (לקוח)';
+  document.querySelector('#mc .macts button:last-child').textContent = 'הוסף';
+  document.querySelector('#mc .macts button:last-child').onclick = addContact;
+  save(); closeM('mc'); renderAll();
+  if(_du) openDr(_du);
+}
 function saveContactField(cid, field, val){
   const c=S.contacts.find(x=>x.id===cid); if(!c) return;
   c[field]=val; save();
@@ -1004,6 +1069,10 @@ function renderC(){
       </td>
       <td style="font-size:12px;color:var(--tx2)">${c.phone||'—'}</td>
       <td style="font-size:12px;color:var(--bl)">${c.email||'—'}</td>
+      <td onclick="event.stopPropagation()" style="padding:0 4px;white-space:nowrap">
+        <button class="btn btn-sm" onclick="openEditC('${c.id}')" style="padding:2px 8px;font-size:11px">✏️</button>
+        <button class="btn btn-del btn-sm" onclick="delC('${c.id}')" style="padding:2px 8px;font-size:11px">✕</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1138,7 +1207,11 @@ function openDr(uid){
           <span style="font-size:10px;color:${wrmColors[wrm]};font-weight:600">${wrmTxt[wrm]}</span>
         </div>
         <div class="dr-lnk">${c.phone?`<span style="color:var(--tx2)">${c.phone}</span>`:''} ${c.email?`<a href="mailto:${c.email}" style="color:var(--bl);text-decoration:none">${c.email}</a>`:''}</div>
-      </div><button class="btn btn-del btn-sm" onclick="delC('${c.id}')">✕</button></div>`;
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="btn btn-sm" onclick="openEditC('${c.id}')" style="padding:2px 8px;font-size:11px">✏️</button>
+        <button class="btn btn-del btn-sm" onclick="delC('${c.id}')">✕</button>
+      </div></div>`;
   }).join('');
   const tRows=team.length?team.map(t=>`
     <div class="trow">
@@ -1157,11 +1230,20 @@ function openDr(uid){
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--br)">
       ${sp(u.status)}
       <span style="font-size:12px;color:var(--tx3);margin-right:auto">${cons.length} קשר • ${team.length} צוות</span>
-      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--tx2)">
-        📅 <input type="date" value="${u.lastMeeting||''}"
-          style="border:1px solid var(--br2);border-radius:5px;padding:3px 7px;font-family:inherit;font-size:12px;color:var(--tx);outline:none"
-          onchange="saveDate(event,'${u.id}')" title="פגישה אחרונה">
-      </label>
+      <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--tx2)">
+        <label style="display:flex;align-items:center;gap:4px">
+          <span style="color:var(--tx3)">📅 אחרונה</span>
+          <input type="date" value="${u.lastMeeting||''}"
+            style="border:1px solid var(--br2);border-radius:5px;padding:3px 7px;font-family:inherit;font-size:12px;color:var(--tx);outline:none"
+            onchange="saveDate(event,'${u.id}','last')">
+        </label>
+        <label style="display:flex;align-items:center;gap:4px">
+          <span style="color:var(--tx3)">🗓 הבאה</span>
+          <input type="date" value="${u.nextMeeting||''}"
+            style="border:1px solid var(--br2);border-radius:5px;padding:3px 7px;font-family:inherit;font-size:12px;color:${u.nextMeeting&&u.nextMeeting<new Date().toISOString().slice(0,10)?'var(--re)':'var(--bl)'};outline:none"
+            onchange="saveDate(event,'${u.id}','next')">
+        </label>
+      </div>
       <button class="btn btn-del btn-sm" onclick="delU('${u.id}')">מחק</button>
     </div>
     <div class="dr-sec">
@@ -1227,16 +1309,59 @@ function renderDrChips(uid){
 }
 function closeD(){document.getElementById('ov').classList.remove('on');document.getElementById('dr').classList.remove('on');}
 function delU(uid){if(!confirm('למחוק?'))return;S.units=S.units.filter(u=>u.id!==uid);save();closeD();renderAll();}
-function delC(cid){if(!confirm('למחוק?'))return;S.contacts=S.contacts.filter(c=>c.id!==cid);save();renderAll();openDr(_du);}
+function delC(cid){const c=S.contacts.find(x=>x.id===cid);if(!confirm(`למחוק את ${c?c.name:'איש הקשר'}?\nפעולה זו אינה ניתנת לביטול.`))return;S.contacts=S.contacts.filter(c=>c.id!==cid);save();renderAll();openDr(_du);}
 function delT(tid){if(!confirm('למחוק?'))return;S.team=S.team.filter(t=>t.id!==tid);save();renderAll();openDr(_du);}
 
 // ═══════════ ADD FUNCTIONS ═══════════
 function fillUSel(id,pre){document.getElementById(id).innerHTML=S.units.map(u=>`<option value="${u.id}"${u.id===pre?' selected':''}>${u.name} (${u.co==='elta'?'אלתא':'תע״א'})</option>`).join('');}
 function openM(id){document.getElementById(id).classList.add('on');}
-function closeM(id){document.getElementById(id).classList.remove('on');}
+function closeM(id){
+  document.getElementById(id).classList.remove('on');
+  if(id==='mc'&&_editCid){
+    _editCid=null;
+    document.querySelector('#mc h2').textContent='➕ הוסף איש קשר (לקוח)';
+    const btn=document.querySelector('#mc .macts button:last-child');
+    btn.textContent='הוסף'; btn.onclick=addContact;
+  }
+  if(id==='mu'&&_editUid){ _editUid=null; _resetUnitModal(); }
+}
+let _editUid = null;
+function openEditUnit(uid){
+  const u = gu(uid); if(!u) return;
+  _editUid = uid;
+  document.getElementById('nu-n').value   = u.name||'';
+  document.getElementById('nu-co').value  = u.co||'elta';
+  document.getElementById('nu-st').value  = u.status||'none';
+  document.getElementById('nu-pot').value = u.potential||'';
+  document.getElementById('nu-pri').value = u.priority||'';
+  document.getElementById('nu-note').value= u.note||'';
+  document.getElementById('mu-title').textContent = '✏️ עריכת יחידה';
+  const btn = document.getElementById('mu-save-btn');
+  btn.textContent = 'שמור'; btn.onclick = saveEditUnit;
+  openM('mu');
+}
+function saveEditUnit(){
+  const u = gu(_editUid); if(!u){_editUid=null;return;}
+  const name = document.getElementById('nu-n').value.trim();
+  if(!name) return alert('הכנס שם');
+  u.name   = name;
+  u.co       = document.getElementById('nu-co').value;
+  u.status   = document.getElementById('nu-st').value;
+  u.potential= parseFloat(document.getElementById('nu-pot').value)||0;
+  u.priority = document.getElementById('nu-pri').value||'';
+  u.note     = document.getElementById('nu-note').value.trim();
+  _editUid = null;
+  _resetUnitModal();
+  save(); closeM('mu'); renderAll();
+}
+function _resetUnitModal(){
+  document.getElementById('mu-title').textContent = '➕ הוסף יחידה';
+  const btn = document.getElementById('mu-save-btn');
+  btn.textContent = 'הוסף'; btn.onclick = addUnit;
+}
 function addUnit(){
   const name=document.getElementById('nu-n').value.trim();if(!name)return alert('הכנס שם');
-  S.units.push({id:nuid(),co:document.getElementById('nu-co').value,name,status:document.getElementById('nu-st').value,have:[],opp:[],note:document.getElementById('nu-note').value.trim()});
+  S.units.push({id:nuid(),co:document.getElementById('nu-co').value,name,status:document.getElementById('nu-st').value,potential:parseFloat(document.getElementById('nu-pot').value)||0,priority:document.getElementById('nu-pri').value||'',have:[],opp:[],note:document.getElementById('nu-note').value.trim()});
   save();closeM('mu');renderAll();
 }
 function openAddCForU(uid){
@@ -1811,11 +1936,27 @@ let TLF='all', _editEventId=null;
 
 function setTLF(f,el){TLF=f;document.querySelectorAll('#view-timeline .fc').forEach(b=>b.classList.remove('on'));if(el)el.classList.add('on');renderTimeline();}
 
+function fillTLUnitSel(){
+  const sel=document.getElementById('tlf-unit');
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">כל היחידות</option>';
+  // Only units that have events
+  const usedIds=[...new Set((S.events||[]).map(e=>e.unit).filter(Boolean))];
+  usedIds.forEach(uid=>{
+    const u=gu(uid);
+    if(u){const opt=document.createElement('option');opt.value=uid;opt.textContent=`${cop(u.co)} ${u.name}`;sel.appendChild(opt);}
+  });
+  sel.value=cur||'';
+}
+
 function renderTimeline(filterUnit){
   if(!S.events) S.events=[];
+  fillTLUnitSel();
+  const unitFilter = filterUnit || (document.getElementById('tlf-unit')||{}).value || '';
   let list=[...S.events];
   if(TLF!=='all') list=list.filter(e=>e.type===TLF);
-  if(filterUnit)  list=list.filter(e=>e.unit===filterUnit);
+  if(unitFilter)  list=list.filter(e=>e.unit===unitFilter);
   list.sort((a,b)=>b.date.localeCompare(a.date)); // newest first
 
   const wrap=document.getElementById('timeline-wrap');
