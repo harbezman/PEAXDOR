@@ -2,6 +2,9 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>AccountIQ — תע״א ואלתא</title>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -646,9 +649,10 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 let _syncTimeout = null;
 let _syncing = false;
 
-async function sbFetch(method, body) {
+async function sbFetch(method, body, silent=false) {
   try {
-    const res = await fetch(SB_URL + '/rest/v1/accountiq_data?id=eq.main', {
+    const url = method === 'GET' ? SB_URL + '/rest/v1/accountiq_data?id=eq.main&select=data,updated_at' : SB_URL + '/rest/v1/accountiq_data?id=eq.main';
+    const res = await fetch(url, {
       method,
       headers: {
         'apikey': SB_KEY,
@@ -662,7 +666,10 @@ async function sbFetch(method, body) {
     if (method === 'GET') return res.json();
     return true;
   } catch(e) {
-    console.warn('Supabase error:', e);
+    if (!silent) {
+      if (e.message === 'Failed to fetch') console.warn('Supabase: אין חיבור רשת או שהדף נפתח מ-file://');
+      else console.warn('Supabase error:', e);
+    }
     return null;
   }
 }
@@ -690,7 +697,9 @@ function save() {
   _syncTimeout = setTimeout(async () => {
     if (_syncing) return;
     _syncing = true;
-    const ok = await sbFetch('PATCH', { data: S, updated_at: new Date().toISOString() });
+    const ts = new Date().toISOString();
+    const ok = await sbFetch('PATCH', { data: S, updated_at: ts });
+    if (ok) _lastUpdatedAt = ts;
     _syncing = false;
     setSyncStatus(ok ? 'saved' : 'error');
   }, 1500);
@@ -729,6 +738,32 @@ async function load() {
   }).catch(()=>setSyncStatus('offline'));
 }
 function doReset(){if(!confirm('לאפס?'))return;localStorage.removeItem(SK);load();renderAll();}
+
+// ═══════════ POLLING — sync every 30s ═══════════
+let _lastUpdatedAt = null;
+async function pollCloud() {
+  try {
+    const rows = await sbFetch('GET', undefined, true);
+    if (!rows || !rows.length || !rows[0].data) return;
+    const serverUpdatedAt = rows[0].updated_at;
+    if (serverUpdatedAt === _lastUpdatedAt) return;
+    _lastUpdatedAt = serverUpdatedAt;
+    const newData = rows[0].data;
+    if (JSON.stringify(newData) !== JSON.stringify(S)) {
+      S = newData;
+      if(!S.units)    S.units=[];
+      if(!S.contacts) S.contacts=[];
+      if(!S.team)     S.team=[];
+      if(!S.vendors)  S.vendors={};
+      if(!S.tasks)    S.tasks=[];
+      if(!S.events)   S.events=[];
+      try { localStorage.setItem(SK, JSON.stringify(S)); } catch(e) {}
+      renderAll();
+      setSyncStatus('saved');
+    }
+  } catch(e) {}
+}
+setInterval(pollCloud, 30000);
 
 // ═══════════ CONSTANTS ═══════════
 const PM={srv:'🖥 שרתים',stor:'💾 אחסון',hci:'🔲 HCI',gpu:'⚡ שרתי GPU',net:'🌐 תקשורת',bc:'♻️ גיבוי',auto:'⚙️ אוטומציה',virt:'🖧 וירטואליזציה',edge:'💻 קצה',ai:'🤖 AI'};
